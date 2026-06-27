@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A-Pay | Merchant Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center font-sans">
+
+  <!-- LOGIN VIEW -->
+  <div id="loginView" class="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8 border border-slate-200">
+    <h1 class="text-2xl font-bold text-slate-800 mb-1">A-Pay</h1>
+    <p class="text-sm text-slate-500 mb-6">Merchant Login</p>
+
+    <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+    <input id="emailInput" type="email" class="w-full mb-3 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+
+    <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+    <input id="passwordInput" type="password" class="w-full mb-4 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+
+    <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50">
+      Log In
+    </button>
+
+    <p id="loginError" class="mt-3 text-sm text-red-600 hidden"></p>
+  </div>
+
+  <!-- DASHBOARD VIEW (hidden until logged in) -->
+  <div id="dashboardView" class="hidden w-full max-w-md bg-white rounded-2xl shadow-lg p-8 border border-slate-200">
+    <div class="flex justify-between items-start mb-1">
+      <h1 class="text-2xl font-bold text-slate-800">A-Pay</h1>
+      <button id="logoutBtn" class="text-xs text-slate-400 hover:text-slate-600 underline">Log out</button>
+    </div>
+    <p class="text-sm text-slate-500 mb-6">Tap-to-Pay Session</p>
+
+    <label class="block text-sm font-medium text-slate-700 mb-1">Amount (ZAR)</label>
+    <div class="relative mb-4">
+      <span class="absolute left-3 top-2.5 text-slate-400">R</span>
+      <input id="amountInput" type="number" min="1" step="0.01" placeholder="0.00"
+        class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+    </div>
+
+    <button id="startBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50">
+      Start Transaction
+    </button>
+
+    <div id="statusBox" class="mt-5 hidden">
+      <div class="flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <span class="text-sm font-medium">Transaction Ready — show link to customer</span>
+      </div>
+      <p class="mt-3 text-xs text-slate-400 break-all" id="sessionIdDisplay"></p>
+    </div>
+
+    <p id="errorBox" class="mt-4 text-sm text-red-600 hidden"></p>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://yosmaldrbxjtzhhwyuyy.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvc21hbGRyYnhqdHpoaHd5dXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MjE0MjQsImV4cCI6MjA5ODA5NzQyNH0.nrlBqnNvCikinoiOswy31f6Ctqp_-1e_l0Yi_1zrQRk";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const loginView = document.getElementById("loginView");
+  const dashboardView = document.getElementById("dashboardView");
+  const emailInput = document.getElementById("emailInput");
+  const passwordInput = document.getElementById("passwordInput");
+  const loginBtn = document.getElementById("loginBtn");
+  const loginError = document.getElementById("loginError");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  const amountInput = document.getElementById("amountInput");
+  const startBtn = document.getElementById("startBtn");
+  const statusBox = document.getElementById("statusBox");
+  const errorBox = document.getElementById("errorBox");
+  const sessionIdDisplay = document.getElementById("sessionIdDisplay");
+
+  let currentMerchantId = null; // resolved after login, from merchants table
+
+  // --- Check if already logged in on page load ---
+  async function checkSession() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+      await loadMerchant();
+    }
+  }
+
+  // --- Look up the merchant row tied to the logged-in user ---
+ async function loadMerchant() {
+  console.log("loadMerchant: starting");
+
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  console.log("loadMerchant: got user", user);
+
+  const { data: merchant, error } = await supabaseClient
+    .from("merchants")
+    .select("id, name")
+    .eq("owner_id", user.id)
+    .single();
+
+  console.log("loadMerchant: merchant query result", merchant, error);
+
+  if (error || !merchant) {
+    console.log("loadMerchant: hit error branch");
+    loginError.textContent = "Logged in, but no merchant record found for this account.";
+    loginError.classList.remove("hidden");
+    await supabaseClient.auth.signOut();
+    return;
+  }
+
+  console.log("loadMerchant: success, switching views");
+  currentMerchantId = merchant.id;
+  loginView.classList.add("hidden");
+  dashboardView.classList.remove("hidden");
+  console.log("loadMerchant: loginView hidden?", loginView.classList.contains("hidden"));
+  console.log("loadMerchant: dashboardView hidden?", dashboardView.classList.contains("hidden"));
+}
+
+  // --- Login ---
+  loginBtn.addEventListener("click", async () => {
+    loginError.classList.add("hidden");
+    loginBtn.disabled = true;
+    loginBtn.textContent = "Logging in...";
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: emailInput.value,
+      password: passwordInput.value,
+    });
+
+    loginBtn.disabled = false;
+    loginBtn.textContent = "Log In";
+
+    if (error) {
+      loginError.textContent = error.message;
+      loginError.classList.remove("hidden");
+      return;
+    }
+
+    await loadMerchant();
+  });
+
+  // --- Logout ---
+  logoutBtn.addEventListener("click", async () => {
+    await supabaseClient.auth.signOut();
+    currentMerchantId = null;
+    dashboardView.classList.add("hidden");
+    loginView.classList.remove("hidden");
+    emailInput.value = "";
+    passwordInput.value = "";
+  });
+
+  // --- Start transaction (now uses the real authenticated session) ---
+startBtn.addEventListener("click", async () => {
+  console.log("startBtn: click fired, currentMerchantId =", currentMerchantId);
+
+  const amount = parseFloat(amountInput.value);
+  console.log("startBtn: parsed amount =", amount);
+
+  errorBox.classList.add("hidden");
+  statusBox.classList.add("hidden");
+
+  if (!amount || amount <= 0) {
+    console.log("startBtn: amount invalid, stopping");
+    errorBox.textContent = "Please enter a valid amount.";
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
+  startBtn.disabled = true;
+  startBtn.textContent = "Creating session...";
+
+  console.log("startBtn: about to insert");
+
+  const { data, error } = await supabaseClient
+    .from("sessions")
+    .insert({
+      merchant_id: currentMerchantId,
+      amount: amount,
+      status: "active",
+    })
+    .select()
+    .single();
+
+  console.log("startBtn: insert result", data, error);
+
+  startBtn.disabled = false;
+  startBtn.textContent = "Start Transaction";
+
+  if (error) {
+    console.log("startBtn: hit error branch");
+    errorBox.textContent = "Failed to create session: " + error.message;
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
+  console.log("startBtn: success, updating UI");
+  const checkoutUrl = `${window.location.origin}/checkout.html?m=${currentMerchantId}`;
+  sessionIdDisplay.textContent = `Session ID: ${data.id} · Checkout: ${checkoutUrl}`;
+  statusBox.classList.remove("hidden");
+  console.log("startBtn: done");
+});
+
+  checkSession();
+</script>
+</body>
+</html>

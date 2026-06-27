@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A-Pay | Checkout</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center font-sans">
+
+  <div class="text-center">
+    <div id="loadingState" class="flex flex-col items-center gap-4">
+      <svg class="animate-spin h-10 w-10 text-indigo-600" viewBox="0 0 24 24" fill="none">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <p class="text-slate-600 font-medium" id="loadingText">Preparing your payment...</p>
+    </div>
+
+    <div id="errorState" class="hidden text-red-600 max-w-sm">
+      <p class="font-semibold" id="errorText">Something went wrong.</p>
+      <p class="text-sm text-slate-400 mt-2">Please ask the merchant to start a new transaction.</p>
+    </div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://yosmaldrbxjtzhhwyuyy.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvc21hbGRyYnhqdHpoaHd5dXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MjE0MjQsImV4cCI6MjA5ODA5NzQyNH0.nrlBqnNvCikinoiOswy31f6Ctqp_-1e_l0Yi_1zrQRk";
+  const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/initialize-transaction`;
+
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const loadingText = document.getElementById("loadingText");
+  const loadingState = document.getElementById("loadingState");
+  const errorState = document.getElementById("errorState");
+  const errorText = document.getElementById("errorText");
+
+  function showError(message) {
+    loadingState.classList.add("hidden");
+    errorState.classList.remove("hidden");
+    errorText.textContent = message;
+  }
+
+  async function runCheckout() {
+    const params = new URLSearchParams(window.location.search);
+    const merchantId = params.get("m");
+
+    if (!merchantId) {
+      showError("Missing merchant reference in URL.");
+      return;
+    }
+
+    loadingText.textContent = "Finding your transaction...";
+    const { data: sessionRows, error: sessionError } = await supabaseClient
+      .rpc("get_latest_active_session", { p_merchant_id: merchantId });
+
+    if (sessionError || !sessionRows || sessionRows.length === 0) {
+      showError("No active transaction found for this merchant.");
+      return;
+    }
+
+    const session = sessionRows[0];
+
+    loadingText.textContent = "Connecting to payment gateway...";
+    let initResponse;
+    try {
+      initResponse = await fetch(EDGE_FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          merchant_id: merchantId,
+          amount: session.amount,
+          session_id: session.id,
+        }),
+      });
+    } catch (networkErr) {
+      showError("Unable to reach payment service. Check your connection.");
+      return;
+    }
+
+    const initData = await initResponse.json();
+
+    if (!initResponse.ok || !initData.authorization_url) {
+      showError(initData.error || "Failed to initialize payment.");
+      return;
+    }
+
+    loadingText.textContent = "Redirecting to secure checkout...";
+    window.location.href = initData.authorization_url;
+  }
+
+  runCheckout();
+</script>
+</body>
+</html>

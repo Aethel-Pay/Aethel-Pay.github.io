@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A-Pay — Tap to pay, anywhere</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F6F8FC;
+    --surface: #FFFFFF;
+    --surface-2: #EEF3FB;
+    --ink: #101828;
+    --muted: #5B6478;
+    --blue: #2563EB;
+    --blue-dim: rgba(37, 99, 235, 0.10);
+    --blue-deep: #1640B8;
+    --border: rgba(16, 24, 40, 0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  h1, h2, .display {
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  /* ---- Nav ---- */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 28px 24px;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .brand {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); display: inline-block; }
+  .nav-cta {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 9px 18px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .nav-cta:hover { border-color: var(--blue); background: var(--blue-dim); }
+  .nav-cta:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  /* ---- Hero ---- */
+  .hero {
+    padding: 72px 24px 100px;
+    max-width: 1080px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-size: clamp(40px, 5.5vw, 64px);
+    line-height: 1.04;
+    font-weight: 700;
+    margin-bottom: 24px;
+    color: var(--ink);
+  }
+  h1 em {
+    font-style: normal;
+    color: var(--blue);
+  }
+  .lede {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 460px;
+    margin-bottom: 32px;
+  }
+  .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--blue);
+    color: #FFFFFF;
+    padding: 14px 26px;
+    border-radius: 100px;
+    font-weight: 600;
+    font-size: 15px;
+    display: inline-block;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 24px var(--blue-dim); background: var(--blue-deep); }
+  .btn-primary:focus-visible { outline: 2px solid var(--blue-deep); outline-offset: 3px; }
+  .btn-secondary {
+    padding: 14px 22px;
+    border-radius: 100px;
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-secondary:hover { color: var(--ink); }
+  .btn-secondary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 100px; }
+
+  /* ---- Tap visual (signature element) ---- */
+  .tap-stage {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ripple {
+    position: absolute;
+    border: 1.5px solid var(--blue);
+    border-radius: 50%;
+    opacity: 0;
+    animation: ripple 2.8s ease-out infinite;
+  }
+  .ripple.r2 { animation-delay: 0.7s; }
+  .ripple.r3 { animation-delay: 1.4s; }
+  @keyframes ripple {
+    0%   { width: 70px;  height: 70px;  opacity: 0.45; }
+    100% { width: 420px; height: 420px; opacity: 0; }
+  }
+  .tap-core {
+    position: relative;
+    width: 132px;
+    height: 132px;
+    border-radius: 36px;
+    background: linear-gradient(155deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: 0 20px 50px rgba(16,24,40,0.08);
+  }
+  .tap-core svg { width: 52px; height: 52px; }
+  @media (prefers-reduced-motion: reduce) {
+    .ripple { animation: none; opacity: 0.2; }
+  }
+
+  /* ---- Section shared ---- */
+  section.block {
+    padding: 80px 24px;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .block-head { max-width: 560px; margin-bottom: 48px; }
+  .block-head .eyebrow { margin-bottom: 14px; }
+  h2 { font-size: clamp(28px, 3.5vw, 38px); font-weight: 600; line-height: 1.15; color: var(--ink); }
+  .block-head p { color: var(--muted); font-size: 16px; margin-top: 14px; line-height: 1.6; }
+
+  /* ---- How it works ---- */
+  .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border-radius: 20px; overflow: hidden; border: 1px solid var(--border); }
+  .flow-step { background: var(--surface); padding: 32px 28px; }
+  .flow-num { font-family: 'Space Grotesk', sans-serif; color: var(--blue); font-size: 14px; font-weight: 600; margin-bottom: 18px; }
+  .flow-step h3 { font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 600; margin-bottom: 10px; color: var(--ink); }
+  .flow-step p { color: var(--muted); font-size: 14.5px; line-height: 1.55; }
+
+  /* ---- Orchestrator explainer ---- */
+  .split-row { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+  .ledger {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 10px 30px rgba(16,24,40,0.04);
+  }
+  .ledger-row { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .ledger-row:last-child { border-bottom: none; }
+  .ledger-row .label { color: var(--muted); font-size: 14px; }
+  .ledger-row .value { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; color: var(--ink); }
+  .ledger-row.total .value { color: var(--blue); }
+  .split-copy p { color: var(--muted); font-size: 16px; line-height: 1.7; margin-bottom: 16px; }
+  .split-copy strong { color: var(--ink); font-weight: 600; }
+
+  /* ---- Pricing: single plan ---- */
+  .price-card {
+    background: linear-gradient(155deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 44px;
+    text-align: center;
+    max-width: 380px;
+    margin: 0 auto 56px;
+    box-shadow: 0 16px 40px rgba(16,24,40,0.06);
+  }
+  .price-card .eyebrow { display: flex; justify-content: center; }
+  .price-amount { font-family: 'Space Grotesk', sans-serif; font-size: 52px; font-weight: 700; color: var(--ink); margin: 8px 0 4px; }
+  .price-amount span { font-size: 16px; font-weight: 500; color: var(--muted); }
+  .price-card p.price-desc { color: var(--muted); font-size: 14.5px; margin-top: 14px; line-height: 1.6; }
+  .price-check-list { list-style: none; margin-top: 22px; text-align: left; display: inline-block; }
+  .price-check-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--ink); margin-bottom: 10px; }
+  .price-check-list svg { flex-shrink: 0; margin-top: 2px; }
+
+  /* ---- Calculator ---- */
+  .calc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 10px 30px rgba(16,24,40,0.04);
+  }
+  .calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .calc-field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .calc-field .input-wrap { position: relative; }
+  .calc-field .prefix { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+  .calc-field input {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    padding: 12px 14px;
+    border-radius: 10px;
+  }
+  .calc-field input.with-prefix { padding-left: 32px; }
+  .calc-field input:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+  /* ---- CTA ---- */
+  .cta-block {
+    text-align: center;
+    padding: 100px 24px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .cta-block h2 { margin-bottom: 16px; }
+  .cta-block p { color: var(--muted); font-size: 16px; margin-bottom: 32px; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1080px;
+    margin: 0 auto;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; padding-top: 32px; }
+    .tap-stage { order: -1; max-width: 280px; margin: 0 auto 16px; }
+    .flow { grid-template-columns: 1fr; }
+    .split-row { grid-template-columns: 1fr; gap: 32px; }
+    .calc-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><span class="dot"></span>A-Pay</div>
+  <a class="nav-cta" href="dashboard.html">Merchant login</a>
+</nav>
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">Tap-to-pay infrastructure</div>
+    <h1>One tap.<br>Money where it<br>belongs, <em>instantly</em>.</h1>
+    <p class="lede">A-Pay turns any NFC card or link into a live checkout. A customer taps, pays, and the funds land straight in your account — every time.</p>
+    <div class="hero-actions">
+      <a class="btn-primary" href="dashboard.html">Open merchant dashboard</a>
+      <a class="btn-secondary" href="#how">See how it works →</a>
+    </div>
+  </div>
+  <div class="tap-stage" aria-hidden="true">
+    <span class="ripple"></span>
+    <span class="ripple r2"></span>
+    <span class="ripple r3"></span>
+    <div class="tap-core">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="1.6">
+        <path d="M6 8.5a6 6 0 0 1 12 0" stroke-linecap="round"/>
+        <path d="M8.5 11a3.5 3.5 0 0 1 7 0" stroke-linecap="round"/>
+        <circle cx="12" cy="14.5" r="1.4" fill="#2563EB" stroke="none"/>
+      </svg>
+    </div>
+  </div>
+</header>
+
+<section class="block" id="how">
+  <div class="block-head">
+    <div class="eyebrow">How it works</div>
+    <h2>Three steps, no terminal required</h2>
+    <p>Every transaction runs through the same sequence — fast enough that the customer barely notices it happened.</p>
+  </div>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">01</div>
+      <h3>Merchant sets the amount</h3>
+      <p>One tap on the dashboard opens a live session for whatever's being charged right now.</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">02</div>
+      <h3>Customer taps to pay</h3>
+      <p>An NFC tap or a single link takes them straight to a secure checkout — no app to install.</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">03</div>
+      <h3>Funds settle automatically</h3>
+      <p>Payment confirmation comes back instantly, and the session closes itself out.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="split-row">
+    <div class="split-copy">
+      <div class="eyebrow">Built as an orchestrator, not a custodian</div>
+      <h2 style="margin-bottom: 18px;">Your money never sits with us</h2>
+      <p>A-Pay doesn't hold funds between a payment and a payout. Every transaction routes directly to your own bank-linked account through Paystack — the same instant the customer pays.</p>
+      <p><strong>That means no float, no settlement lag, and no question of where the money is</strong> while it's in transit.</p>
+    </div>
+    <div class="ledger" role="img" aria-label="Example of a R250 transaction on A-Pay">
+      <div class="ledger-row">
+        <span class="label">Customer pays</span>
+        <span class="value">R 250.00</span>
+      </div>
+      <div class="ledger-row">
+        <span class="label">Paystack fee (2.9% + R1)</span>
+        <span class="value">R 8.25</span>
+      </div>
+      <div class="ledger-row total">
+        <span class="label">You receive</span>
+        <span class="value">R 241.75</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="pricing">
+  <div class="block-head" style="margin: 0 auto 48px; text-align: center;">
+    <div class="eyebrow" style="display:flex; justify-content:center;">Pricing</div>
+    <h2>One simple monthly fee</h2>
+    <p>No commission on your sales, ever. Paystack's own processing fee is separate and goes straight to them — A-Pay never touches it.</p>
+  </div>
+
+  <div class="price-card">
+    <div class="eyebrow">A-Pay subscription</div>
+    <div class="price-amount">R29.99<span> / month</span></div>
+    <p class="price-desc">Unlimited tap-to-pay sessions, however many sales you run.</p>
+    <ul class="price-check-list">
+      <li>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#2563EB" stroke-width="1.3"/><path d="M5 8l2 2 4-4" stroke="#2563EB" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>No commission taken from any sale</span>
+      </li>
+      <li>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#2563EB" stroke-width="1.3"/><path d="M5 8l2 2 4-4" stroke="#2563EB" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>No hardware, no contracts</span>
+      </li>
+      <li>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#2563EB" stroke-width="1.3"/><path d="M5 8l2 2 4-4" stroke="#2563EB" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Cancel any time</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="split-row" style="align-items:start;">
+    <div class="split-copy">
+      <h3 style="font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:600; margin-bottom:14px; color: var(--ink);">See what the subscription actually costs you</h3>
+      <p>Since A-Pay charges one flat R29.99/month and nothing per sale, the more you sell, the smaller that fee gets as a share of your turnover. Enter a typical sale amount and how many sales you make a month to see it for yourself.</p>
+      <p style="font-size:13px; color:var(--muted); opacity:0.9;">Paystack's local rate (2.9% + R1, excl. VAT) still applies per transaction — that's set by Paystack, not A-Pay. VAT may apply on top per their terms.</p>
+    </div>
+
+    <div class="calc-card">
+      <div class="calc-grid">
+        <div class="calc-field">
+          <label for="calcAmount">Average sale amount</label>
+          <div class="input-wrap">
+            <span class="prefix">R</span>
+            <input id="calcAmount" type="number" min="0" step="0.01" value="100" class="with-prefix" />
+          </div>
+        </div>
+        <div class="calc-field">
+          <label for="calcVolume">Sales per month</label>
+          <div class="input-wrap">
+            <input id="calcVolume" type="number" min="0" step="1" value="60" />
+          </div>
+        </div>
+      </div>
+
+      <div class="ledger-row">
+        <span class="label">Total monthly sales</span>
+        <span class="value" id="outGross">R 6,000.00</span>
+      </div>
+      <div class="ledger-row">
+        <span class="label">Paystack fees (total)</span>
+        <span class="value" id="outPaystack">R 165.00</span>
+      </div>
+      <div class="ledger-row">
+        <span class="label">A-Pay subscription</span>
+        <span class="value">R 29.99</span>
+      </div>
+      <div class="ledger-row total">
+        <span class="label">A-Pay's fee as % of sales</span>
+        <span class="value" id="outPercent">0.50%</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  const amountInput = document.getElementById('calcAmount');
+  const volumeInput = document.getElementById('calcVolume');
+  const outGross = document.getElementById('outGross');
+  const outPaystack = document.getElementById('outPaystack');
+  const outPercent = document.getElementById('outPercent');
+
+  const MONTHLY_FEE = 29.99;
+
+  function fmt(n) {
+    return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function recalc() {
+    const amount = Math.max(0, parseFloat(amountInput.value) || 0);
+    const volume = Math.max(0, parseFloat(volumeInput.value) || 0);
+
+    const gross = amount * volume;
+    // Paystack's published local rate: 2.9% + R1, excl. VAT, per transaction
+    const paystackFees = volume * (amount * 0.029 + 1);
+    const percentOfSales = gross > 0 ? (MONTHLY_FEE / gross) * 100 : 0;
+
+    outGross.textContent = fmt(gross);
+    outPaystack.textContent = fmt(paystackFees);
+    outPercent.textContent = percentOfSales.toFixed(2) + '%';
+  }
+
+  amountInput.addEventListener('input', recalc);
+  volumeInput.addEventListener('input', recalc);
+
+  recalc();
+})();
+</script>
+
+<section class="cta-block">
+  <div class="eyebrow" style="display:flex; justify-content:center;">For merchants</div>
+  <h2>Already onboarded? Start a session.</h2>
+  <p>Log in to set today's amount and get a live checkout link ready in seconds.</p>
+  <a class="btn-primary" href="dashboard.html">Go to dashboard</a>
+</section>
+
+<footer>
+  <span>A-Pay · part of Aethelwine Homes</span>
+  <span>Built on Paystack split payments</span>
+</footer>
+
+</body>
+</html>
